@@ -30,6 +30,10 @@
 
 - 点击用户头像跳转打开用户的b站空间
 
+打开左上角按钮点击“返回”可以回到入口页
+
+![img](.img/README/wps6.jpg) 
+
 ## 使用说明
 
 本项目最终采用前后端集成部署的方案，因此whoreplytomyvideosweb前端vue项目打包好的页面需放在whoreplytomyvideosserver项目的resources文件夹下。
