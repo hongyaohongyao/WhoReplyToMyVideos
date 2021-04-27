@@ -1,0 +1,21 @@
+module.exports = {
+    devServer: {
+        proxy: {
+            "/img0": {
+                target: "http://i0.hdslb.com", // 本地模拟数据服务器
+                changeOrigin: true,
+                pathRewrite: {
+                    "/img0": ""
+                }
+            },
+            "/img1": {
+                target: "http://i1.hdslb.com", // 本地模拟数据服务器
+                changeOrigin: true,
+                pathRewrite: {
+                    "/img1": ""
+                }
+            }
+        }
+    }
+
+}

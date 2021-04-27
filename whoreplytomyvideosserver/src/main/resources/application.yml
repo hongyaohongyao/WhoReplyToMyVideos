@@ -1,0 +1,13 @@
+wrtmv:
+  hive:
+    url: jdbc:hive2://hadoophost:10000/wrtmv
+    user: hive
+    password: hongyaohongyao
+  my:
+    auth: hyhy
+  common:
+    proxy-ip-file: proxy_ip.ipsrc
+  system-info:
+    work-on-windows: false
+server:
+  port: 12121

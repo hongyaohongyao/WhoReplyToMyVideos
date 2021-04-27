@@ -1,0 +1,94 @@
+wrtmv:
+  create-users-table: >-
+    create external table if not exists users
+      (uid bigint, level int, name string, face string, sex string, sign string)
+    STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+    WITH SERDEPROPERTIES
+      ("hbase.columns.mapping" = ":key,info:level,info:name,info:face,info:sex,info:sign")
+    TBLPROPERTIES("hbase.table.name" = "wrtmv:users")
+  create-replies-table: >-
+    create external table if not exists replies
+      (rpid bigint, oid bigint, mid bigint, content string, parent bigint, ctime bigint)
+    STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+    WITH SERDEPROPERTIES
+      ("hbase.columns.mapping" = ":key,info:oid,info:mid,info:content,info:parent,info:ctime")
+    TBLPROPERTIES("hbase.table.name" = "wrtmv:replies")
+  create-videos-table: >-
+    create external table if not exists videos
+      (bvid string, oid bigint, mid bigint, title string, description string, created bigint)
+    STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+    WITH SERDEPROPERTIES
+      ("hbase.columns.mapping" = ":key,info:oid,info:mid,info:title,info:description,info:created")
+    TBLPROPERTIES("hbase.table.name" = "wrtmv:videos")
+  create-statistics-info-table: >-
+    create table if not exists statisticsinfo
+      (item string, label string, value bigint)
+    partitioned by (owner bigint)
+    stored as orc
+  insert-statistics-info: >-
+    with
+    R as
+      (select * from replies
+      where oid in (select oid from videos where mid=<owner_id>)),
+    A as
+      (select * from
+        (select mid from R group by mid) T
+        join users on T.mid=users.uid)
+    insert overwrite table statisticsinfo
+    partition(owner=<owner_id>)
+    select 'sex' item, sex label, count(*) value
+    from A group by sex
+    union all
+    select 'level' item, cast(level as string) label, count(*) value
+    from A group by level
+    union all
+    select 'hour' item,
+      cast(from_unixtime(ctime, 'H') as string) as label,
+      count(*) value
+    from R
+    group by from_unixtime(ctime, 'H')
+  create-statistics-users-table: >-
+    create table if not exists usersstatistics
+      (mid bigint, name string, face string,
+       sex string, level int,
+       times_r bigint, times_v bigint,
+       firsttime bigint, lasttime bigint,
+       rank_r bigint, rank_r_by_sex bigint,
+       rank_v bigint, rank_v_by_sex bigint,
+       rank_f bigint, rank_f_by_sex bigint,
+       rank_l bigint, rank_l_by_sex bigint)
+    partitioned by (owner bigint)
+    stored as orc
+  select-users-statistics: >-
+    select * from usersstatistics
+    where owner=<owner_id> and
+      <rank_by><=<end> and
+      <rank_by>>=<start>
+  select-statistics-info:
+    select * from statisticsinfo
+    where owner=<owner_id> and item='<item>'
+  insert-users-statistics: >-
+    with
+    A as
+      (select * from replies
+      where oid in (select oid from videos where mid=<owner_id>))
+    insert overwrite table usersstatistics
+    partition(owner=<owner_id>)
+    select mid, name, face, sex, level, times_r, times_v, firsttime, lasttime,
+        row_number() over(order by times_r desc) as rank_r,
+        row_number() over(partition by sex order by times_r desc) as rank_r_by_sex,
+        row_number() over(order by times_v desc) as rank_v,
+        row_number() over(partition by sex order by times_v desc) as rank_v_by_sex,
+        row_number() over(order by firsttime desc) as rank_f,
+        row_number() over(partition by sex order by firsttime desc) as rank_f_by_sex,
+        row_number() over(order by lasttime desc) as rank_l,
+        row_number() over(partition by sex order by lasttime desc) as rank_l_by_sex
+    from
+      (select mid, sum(times_r) times_r, count(*) times_v,
+      min(firsttime) firsttime, max(lasttime) lasttime
+      from
+        (select oid, mid, count(*) times_r,
+        min(ctime) firsttime, max(ctime) lasttime
+        from A group by oid, mid) T0
+      group by mid) T
+      join users on users.uid=T.mid
